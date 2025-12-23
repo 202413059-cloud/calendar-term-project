@@ -31,7 +31,7 @@ class LoginPage extends StatelessWidget {
 
   Future<void> loginWithGoogle(BuildContext context) async {
     try {
-      // ✅ Flutter Web: Popup 로그인 (google_sign_in 패키지 필요 없음)
+      // ✅ Flutter Web: Google Popup 로그인
       if (kIsWeb) {
         final provider = GoogleAuthProvider();
         final result =
@@ -39,8 +39,7 @@ class LoginPage extends StatelessWidget {
 
         debugPrint("구글 로그인 성공 uid=${result.user?.uid}");
       } else {
-        // 지금은 웹으로 실행 중이라 여기 안 탐
-        throw Exception("지금은 Web으로 실행하세요 (chrome/web-server).");
+        throw Exception("지금은 Web으로 실행하세요.");
       }
 
       // ignore: use_build_context_synchronously
@@ -87,9 +86,12 @@ class _EventListPageState extends State<EventListPage> {
   @override
   void initState() {
     super.initState();
-    fetchEvents();
+    fetchEvents(); // 페이지 진입 시 자동 조회
   }
 
+  // --------------------
+  // STEP 9: Read
+  // --------------------
   Future<void> fetchEvents() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -128,6 +130,34 @@ class _EventListPageState extends State<EventListPage> {
         );
       }
     }
+  }
+
+  // --------------------
+  // ✅ STEP 10: Create (Mobile)
+  // --------------------
+  Future<void> addEventFromMobile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint("로그인 안 됨");
+      return;
+    }
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('events')
+        .add({
+      'title': '모바일 일정',
+      'date': '2025-12-26',
+      'startTime': '15:00',
+      'endTime': '16:00',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    debugPrint("모바일 일정 추가 완료");
+
+    // 추가 후 즉시 다시 조회
+    fetchEvents();
   }
 
   Future<void> logout() async {
@@ -177,9 +207,12 @@ class _EventListPageState extends State<EventListPage> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: fetchEvents,
-        child: const Icon(Icons.refresh),
+
+      // 🔥 STEP 10 버튼
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: addEventFromMobile,
+        icon: const Icon(Icons.add),
+        label: const Text("모바일 일정 추가"),
       ),
     );
   }
