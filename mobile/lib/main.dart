@@ -15,12 +15,15 @@ void main() async {
   runApp(const MyApp());
 }
 
+/* ================= App Root ================= */
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
         primaryColor: pointColor,
@@ -42,15 +45,16 @@ class LoginPage extends StatelessWidget {
 
   Future<void> loginWithGoogle(BuildContext context) async {
     try {
-      if (kIsWeb) {
-        final provider = GoogleAuthProvider();
-        await FirebaseAuth.instance.signInWithPopup(provider);
-      } else {
+      if (!kIsWeb) {
         throw Exception("Web으로 실행하세요");
       }
 
-      // ignore: use_build_context_synchronously
-      Navigator.push(
+      final provider = GoogleAuthProvider();
+      await FirebaseAuth.instance.signInWithPopup(provider);
+
+      if (!context.mounted) return;
+
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const TodayEventPage()),
       );
@@ -83,7 +87,7 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-/* ================= 오늘 일정 페이지 (STEP 5 + 6 + 7) ================= */
+/* ================= 오늘 일정 페이지 ================= */
 
 class TodayEventPage extends StatefulWidget {
   const TodayEventPage({super.key});
@@ -102,68 +106,89 @@ class _TodayEventPageState extends State<TodayEventPage> {
     fetchTodayEvents();
   }
 
-  /* ================= STEP 5: 오늘 일정 조회 ================= */
+  /* ================= 오늘 일정 조회 ================= */
 
-Future<void> fetchTodayEvents() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+  Future<void> fetchTodayEvents() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
 
-  final todayString =
-      DateTime.now().toIso8601String().substring(0, 10);
+      if (user == null) {
+        setState(() {
+          loading = false;
+        });
+        return;
+      }
 
-  final snapshot = await FirebaseFirestore.instance
-      .collection('schedules')
-      .where('uid', isEqualTo: user.uid)
-      .where('date', isEqualTo: todayString)
-      .orderBy('createdAt')
-      .get();
+      final todayString =
+          DateTime.now().toIso8601String().substring(0, 10);
 
-  final events = snapshot.docs.map((doc) {
-    return {'id': doc.id, ...doc.data()};
-  }).toList();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('schedules')
+          .where('uid', isEqualTo: user.uid)
+          .where('date', isEqualTo: todayString)
+          .get(); // ❗ orderBy 제거 (무한 로딩 방지)
 
-  setState(() {
-    todayEvents = events;
-    loading = false;
-  });
-}
+      final events = snapshot.docs.map((doc) {
+        return {'id': doc.id, ...doc.data()};
+      }).toList();
 
+      setState(() {
+        todayEvents = events;
+      });
+    } catch (e) {
+      debugPrint("🔥 fetchTodayEvents error: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+  }
 
-  /* ================= STEP 6: 날짜 선택 → 일정 추가 ================= */
-Future<void> addEventWithDatePicker() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+  /* ================= 일정 추가 ================= */
 
-  final pickedDate = await showDatePicker(
-    context: context,
-    initialDate: DateTime.now(),
-    firstDate: DateTime(2024),
-    lastDate: DateTime(2027),
-  );
+  Future<void> addEventWithDatePicker() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  if (pickedDate == null) return;
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2027),
+    );
 
-  final dateString =
-      pickedDate.toIso8601String().substring(0, 10);
+    if (pickedDate == null) return;
 
-  await FirebaseFirestore.instance
-      .collection('schedules')
-      .add({
-    'uid': user.uid,
-    'title': '모바일에서 추가한 일정',
-    'date': dateString,
-    'startTime': '14:00',
-    'endTime': '15:00',
-    'createdAt': FieldValue.serverTimestamp(),
-  });
+    final dateString =
+        pickedDate.toIso8601String().substring(0, 10);
 
-  fetchTodayEvents();
-}
+    await FirebaseFirestore.instance.collection('schedules').add({
+      'uid': user.uid,
+      'title': '모바일에서 추가한 일정',
+      'date': dateString,
+      'startTime': '14:00',
+      'endTime': '15:00',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
+    setState(() {
+      loading = true;
+    });
+    fetchTodayEvents();
+  }
+
+  /* ================= 로그아웃 ================= */
 
   Future<void> logout() async {
     await FirebaseAuth.instance.signOut();
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    }
   }
 
   @override
@@ -180,7 +205,7 @@ Future<void> addEventWithDatePicker() async {
               "Logout",
               style: TextStyle(color: pointColor),
             ),
-          )
+          ),
         ],
       ),
       body: loading
@@ -198,9 +223,7 @@ Future<void> addEventWithDatePicker() async {
                 const Divider(),
                 Expanded(
                   child: todayEvents.isEmpty
-                      ? const Center(
-                          child: Text("오늘 일정이 없습니다"),
-                        )
+                      ? const Center(child: Text("오늘 일정이 없습니다"))
                       : ListView.builder(
                           itemCount: todayEvents.length,
                           itemBuilder: (context, index) {
