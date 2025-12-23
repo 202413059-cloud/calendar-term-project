@@ -31,21 +31,17 @@ class LoginPage extends StatelessWidget {
 
   Future<void> loginWithGoogle(BuildContext context) async {
     try {
-      // ✅ Flutter Web: Google Popup 로그인
       if (kIsWeb) {
         final provider = GoogleAuthProvider();
-        final result =
-            await FirebaseAuth.instance.signInWithPopup(provider);
-
-        debugPrint("구글 로그인 성공 uid=${result.user?.uid}");
+        await FirebaseAuth.instance.signInWithPopup(provider);
       } else {
-        throw Exception("지금은 Web으로 실행하세요.");
+        throw Exception("Web으로 실행하세요");
       }
 
       // ignore: use_build_context_synchronously
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const EventListPage()),
+        MaterialPageRoute(builder: (_) => const TodayEventPage()),
       );
     } catch (e) {
       debugPrint("로그인 실패: $e");
@@ -63,101 +59,79 @@ class LoginPage extends StatelessWidget {
       body: Center(
         child: ElevatedButton(
           onPressed: () => loginWithGoogle(context),
-          child: const Text("Google 로그인 후 일정 보기"),
+          child: const Text("Google 로그인 후 오늘 일정 보기"),
         ),
       ),
     );
   }
 }
 
-/* ================= 일정 목록 페이지 ================= */
+/* ================= 오늘 일정 페이지 (STEP 5) ================= */
 
-class EventListPage extends StatefulWidget {
-  const EventListPage({super.key});
+class TodayEventPage extends StatefulWidget {
+  const TodayEventPage({super.key});
 
   @override
-  State<EventListPage> createState() => _EventListPageState();
+  State<TodayEventPage> createState() => _TodayEventPageState();
 }
 
-class _EventListPageState extends State<EventListPage> {
+class _TodayEventPageState extends State<TodayEventPage> {
   bool loading = true;
-  List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> todayEvents = [];
 
   @override
   void initState() {
     super.initState();
-    fetchEvents(); // 페이지 진입 시 자동 조회
+    fetchTodayEvents();
   }
 
   // --------------------
-  // STEP 9: Read
+  // STEP 5: 오늘 일정 조회
   // --------------------
-  Future<void> fetchEvents() async {
+  Future<void> fetchTodayEvents() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         setState(() {
           loading = false;
-          events = [];
+          todayEvents = [];
         });
         return;
       }
+
+      final today = DateTime.now();
+      final todayString = today.toIso8601String().substring(0, 10);
 
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('events')
-          .orderBy('createdAt', descending: true)
           .get();
 
-      final data = snapshot.docs.map((doc) => doc.data()).toList();
+      final events = snapshot.docs.map((doc) {
+        return {
+          'id': doc.id,
+          ...doc.data(),
+        };
+      }).toList();
+
+      // 🔥 오늘 날짜 필터링
+      final filtered = events.where((e) =>
+        e['date'] == todayString
+      ).toList();
 
       setState(() {
-        events = data;
+        todayEvents = filtered;
         loading = false;
       });
 
-      debugPrint("불러온 일정: $data");
     } catch (e) {
-      debugPrint("일정 불러오기 실패: $e");
+      debugPrint("오늘 일정 불러오기 실패: $e");
       setState(() {
         loading = false;
-        events = [];
+        todayEvents = [];
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("일정 불러오기 실패: $e")),
-        );
-      }
     }
-  }
-
-  // --------------------
-  // ✅ STEP 10: Create (Mobile)
-  // --------------------
-  Future<void> addEventFromMobile() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      debugPrint("로그인 안 됨");
-      return;
-    }
-
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('events')
-        .add({
-      'title': '모바일 일정',
-      'date': '2025-12-26',
-      'startTime': '15:00',
-      'endTime': '16:00',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    debugPrint("모바일 일정 추가 완료");
-
-    // 추가 후 즉시 다시 조회
-    fetchEvents();
   }
 
   Future<void> logout() async {
@@ -171,7 +145,7 @@ class _EventListPageState extends State<EventListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mobile(Web) Event List"),
+        title: const Text("오늘 일정"),
         actions: [
           TextButton(
             onPressed: logout,
@@ -190,16 +164,16 @@ class _EventListPageState extends State<EventListPage> {
                 ),
                 const Divider(),
                 Expanded(
-                  child: events.isEmpty
-                      ? const Center(child: Text("일정이 없습니다"))
+                  child: todayEvents.isEmpty
+                      ? const Center(child: Text("오늘 일정이 없습니다"))
                       : ListView.builder(
-                          itemCount: events.length,
+                          itemCount: todayEvents.length,
                           itemBuilder: (context, index) {
-                            final e = events[index];
+                            final e = todayEvents[index];
                             return ListTile(
                               title: Text(e['title'] ?? ''),
                               subtitle: Text(
-                                "${e['date']} ${e['startTime']} ~ ${e['endTime']}",
+                                "${e['startTime']} ~ ${e['endTime']}",
                               ),
                             );
                           },
@@ -207,13 +181,6 @@ class _EventListPageState extends State<EventListPage> {
                 ),
               ],
             ),
-
-      // 🔥 STEP 10 버튼
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: addEventFromMobile,
-        icon: const Icon(Icons.add),
-        label: const Text("모바일 일정 추가"),
-      ),
     );
   }
 }
