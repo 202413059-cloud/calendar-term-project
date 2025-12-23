@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp } from "firebase/app";   // ⭐ 주석 제거
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
