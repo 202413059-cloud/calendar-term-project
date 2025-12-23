@@ -32,7 +32,6 @@ const login = async () => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
   uid.value = result.user.uid;
-  console.log("login uid:", uid.value);
 };
 
 const logout = async () => {
@@ -82,7 +81,6 @@ const fetchEvents = async () => {
   }));
 
   filteredEvents.value = events.value;
-  console.log("불러온 일정 목록:", events.value);
 };
 
 /* =========================
@@ -155,6 +153,16 @@ const getDaysInMonth = (year, month) => {
 const days = computed(() => {
   return getDaysInMonth(year(), month());
 });
+
+/* =========================
+   📅 STEP 2: 요일 색상
+========================= */
+const getDayClass = (date) => {
+  const day = date.getDay(); // 0:일, 6:토
+  if (day === 0) return "sunday";
+  if (day === 6) return "saturday";
+  return "weekday";
+};
 </script>
 
 <template>
@@ -189,6 +197,7 @@ const days = computed(() => {
         v-for="day in days"
         :key="day.toISOString()"
         class="day"
+        :class="getDayClass(day)"
       >
         {{ day.getDate() }}
       </div>
@@ -232,5 +241,18 @@ const days = computed(() => {
   padding: 12px;
   border: 1px solid #ddd;
   text-align: center;
+}
+
+/* STEP 2: 요일 색상 */
+.weekday {
+  color: #000;
+}
+
+.saturday {
+  color: #2f6fff;
+}
+
+.sunday {
+  color: #ff4d4f;
 }
 </style>
