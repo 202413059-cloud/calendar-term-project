@@ -6,10 +6,21 @@ import { auth, db } from "./firebase";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 
 // Firestore
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const uid = ref("");
+const events = ref([]); // ✅ STEP 4: 일정 목록 상태
 
+// --------------------
+// 로그인 / 로그아웃
+// --------------------
 const login = async () => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
@@ -20,9 +31,12 @@ const login = async () => {
 const logout = async () => {
   await signOut(auth);
   uid.value = "";
+  events.value = [];
 };
 
+// --------------------
 // ✅ STEP 3: Create (일정 추가)
+// --------------------
 const addEvent = async () => {
   const user = auth.currentUser;
   if (!user) {
@@ -40,6 +54,31 @@ const addEvent = async () => {
 
   alert("Firestore에 일정 추가 완료!");
 };
+
+// --------------------
+// ✅ STEP 4: Read (일정 목록 조회)
+// --------------------
+const fetchEvents = async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("먼저 로그인하세요");
+    return;
+  }
+
+  const q = query(
+    collection(db, "users", user.uid, "events"),
+    orderBy("createdAt", "desc")
+  );
+
+  const snapshot = await getDocs(q);
+
+  events.value = snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+
+  console.log("불러온 일정 목록:", events.value);
+};
 </script>
 
 <template>
@@ -56,6 +95,18 @@ const addEvent = async () => {
 
     <hr style="margin:16px 0;" />
 
-    <button @click="addEvent">일정 추가(Create)</button>
+    <div style="display:flex; gap:12px; margin-bottom:16px;">
+      <button @click="addEvent">일정 추가(Create)</button>
+      <button @click="fetchEvents">일정 목록 조회(Read)</button>
+    </div>
+
+    <!-- ✅ STEP 4 결과 출력 -->
+    <ul>
+      <li v-for="event in events" :key="event.id">
+        {{ event.date }} |
+        {{ event.title }}
+        ({{ event.startTime }} ~ {{ event.endTime }})
+      </li>
+    </ul>
   </div>
 </template>
