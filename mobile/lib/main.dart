@@ -110,7 +110,10 @@ class _TodayEventPageState extends State<TodayEventPage> {
 
   Future<void> fetchTodayEvents() async {
     try {
+      print("🔥 fetchTodayEvents 시작");
       final user = FirebaseAuth.instance.currentUser;
+
+      print("🔥 currentUser = ${user?.uid}");
 
       if (user == null) {
         setState(() {
@@ -122,11 +125,15 @@ class _TodayEventPageState extends State<TodayEventPage> {
       final todayString =
           DateTime.now().toIso8601String().substring(0, 10);
 
+      print("🔥 todayString = $todayString");
+
       final snapshot = await FirebaseFirestore.instance
           .collection('schedules')
           .where('uid', isEqualTo: user.uid)
           .where('date', isEqualTo: todayString)
           .get(); // ❗ orderBy 제거 (무한 로딩 방지)
+
+      print("🔥 가져온 문서 수 = ${snapshot.docs.length}");
 
       final events = snapshot.docs.map((doc) {
         return {'id': doc.id, ...doc.data()};
