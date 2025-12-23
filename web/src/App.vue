@@ -13,13 +13,17 @@ import {
   getDocs,
   query,
   orderBy,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
 
 const uid = ref("");
 const events = ref([]);
 const filteredEvents = ref([]);
 
+// --------------------
 // 로그인
+// --------------------
 const login = async () => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
@@ -27,7 +31,9 @@ const login = async () => {
   console.log("login uid:", uid.value);
 };
 
+// --------------------
 // 로그아웃
+// --------------------
 const logout = async () => {
   await signOut(auth);
   uid.value = "";
@@ -35,7 +41,9 @@ const logout = async () => {
   filteredEvents.value = [];
 };
 
+// --------------------
 // STEP 3: Create
+// --------------------
 const addEvent = async () => {
   const user = auth.currentUser;
   if (!user) {
@@ -54,7 +62,9 @@ const addEvent = async () => {
   alert("일정 추가 완료!");
 };
 
+// --------------------
 // STEP 4: Read
+// --------------------
 const fetchEvents = async () => {
   const user = auth.currentUser;
   if (!user) return;
@@ -65,22 +75,43 @@ const fetchEvents = async () => {
   );
 
   const snapshot = await getDocs(q);
-  events.value = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
+  events.value = snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
   }));
 
   console.log("불러온 일정 목록:", events.value);
 };
 
-// STEP 5: 특정 날짜 필터링
+// --------------------
+// STEP 5: 날짜 필터링
+// --------------------
 const getEventsByDate = (date) => {
   filteredEvents.value = events.value.filter(
-    e => e.date === date
+    (e) => e.date === date
   );
 };
-</script>
 
+// --------------------
+// STEP 6: Update (핵심 추가)
+// --------------------
+const updateEvent = async (eventId) => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("먼저 로그인하세요");
+    return;
+  }
+
+  await updateDoc(
+    doc(db, "users", user.uid, "events", eventId),
+    {
+      title: "수정된 일정",
+    }
+  );
+
+  alert("일정 수정 완료!");
+};
+</script>
 <template>
   <div style="padding: 24px">
     <h2>Web Firebase Test</h2>
@@ -107,6 +138,14 @@ const getEventsByDate = (date) => {
       <li v-for="event in filteredEvents" :key="event.id">
         {{ event.date }} | {{ event.title }}
         ({{ event.startTime }} ~ {{ event.endTime }})
+
+        <!-- ✅ STEP 6: Update 버튼 -->
+        <button
+          style="margin-left:10px"
+          @click="updateEvent(event.id)"
+        >
+          수정(Update)
+        </button>
       </li>
     </ul>
   </div>
