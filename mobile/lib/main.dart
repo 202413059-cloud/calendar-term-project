@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,29 +29,42 @@ class MyApp extends StatelessWidget {
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
-  Future<void> loginAndGo(BuildContext context) async {
-    // 🔹 STEP 9 목적상: 익명 로그인 (가장 안정적)
-    await FirebaseAuth.instance.signInAnonymously();
-    debugPrint("로그인 완료");
+  Future<void> loginWithGoogle(BuildContext context) async {
+    try {
+      // ✅ Flutter Web: Popup 로그인 (google_sign_in 패키지 필요 없음)
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        final result =
+            await FirebaseAuth.instance.signInWithPopup(provider);
 
-    // 로그인 후 일정 페이지로 이동
-    // ignore: use_build_context_synchronously
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const EventListPage(),
-      ),
-    );
+        debugPrint("구글 로그인 성공 uid=${result.user?.uid}");
+      } else {
+        // 지금은 웹으로 실행 중이라 여기 안 탐
+        throw Exception("지금은 Web으로 실행하세요 (chrome/web-server).");
+      }
+
+      // ignore: use_build_context_synchronously
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EventListPage()),
+      );
+    } catch (e) {
+      debugPrint("로그인 실패: $e");
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("로그인 실패: $e")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Login")),
+      appBar: AppBar(title: const Text("Login (Google)")),
       body: Center(
         child: ElevatedButton(
-          onPressed: () => loginAndGo(context),
-          child: const Text("로그인 후 일정 보기"),
+          onPressed: () => loginWithGoogle(context),
+          child: const Text("Google 로그인 후 일정 보기"),
         ),
       ),
     );
@@ -67,60 +81,106 @@ class EventListPage extends StatefulWidget {
 }
 
 class _EventListPageState extends State<EventListPage> {
-  List<Map<String, dynamic>> events = [];
   bool loading = true;
+  List<Map<String, dynamic>> events = [];
 
   @override
   void initState() {
     super.initState();
-    fetchEvents(); // ⭐ 페이지 들어오자마자 자동 조회
+    fetchEvents();
   }
 
   Future<void> fetchEvents() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      debugPrint("로그인 안 됨");
-      return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          loading = false;
+          events = [];
+        });
+        return;
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('events')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final data = snapshot.docs.map((doc) => doc.data()).toList();
+
+      setState(() {
+        events = data;
+        loading = false;
+      });
+
+      debugPrint("불러온 일정: $data");
+    } catch (e) {
+      debugPrint("일정 불러오기 실패: $e");
+      setState(() {
+        loading = false;
+        events = [];
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("일정 불러오기 실패: $e")),
+        );
+      }
     }
+  }
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('events')
-        .get();
-
-    final data = snapshot.docs.map((doc) => doc.data()).toList();
-
-    setState(() {
-      events = data;
-      loading = false;
-    });
-
-    debugPrint("불러온 일정: $data");
+  Future<void> logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "(로그인 없음)";
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Mobile Event List"),
+        title: const Text("Mobile(Web) Event List"),
+        actions: [
+          TextButton(
+            onPressed: logout,
+            child: const Text("Logout", style: TextStyle(color: Colors.white)),
+          )
+        ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : events.isEmpty
-              ? const Center(child: Text("일정이 없습니다"))
-              : ListView.builder(
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final e = events[index];
-                    return ListTile(
-                      title: Text(e['title'] ?? ''),
-                      subtitle: Text(
-                        "${e['date']} ${e['startTime']} ~ ${e['endTime']}",
-                      ),
-                    );
-                  },
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text("현재 UID: $uid"),
                 ),
+                const Divider(),
+                Expanded(
+                  child: events.isEmpty
+                      ? const Center(child: Text("일정이 없습니다"))
+                      : ListView.builder(
+                          itemCount: events.length,
+                          itemBuilder: (context, index) {
+                            final e = events[index];
+                            return ListTile(
+                              title: Text(e['title'] ?? ''),
+                              subtitle: Text(
+                                "${e['date']} ${e['startTime']} ~ ${e['endTime']}",
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: fetchEvents,
+        child: const Icon(Icons.refresh),
+      ),
     );
   }
 }
