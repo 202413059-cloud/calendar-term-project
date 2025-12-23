@@ -80,6 +80,8 @@ const fetchEvents = async () => {
     ...docSnap.data(),
   }));
 
+  filteredEvents.value = events.value;
+
   console.log("불러온 일정 목록:", events.value);
 };
 
