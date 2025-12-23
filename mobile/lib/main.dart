@@ -18,10 +18,46 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: EventListPage(),
+      home: LoginPage(),
     );
   }
 }
+
+/* ---------------- 로그인 페이지 ---------------- */
+
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
+
+  Future<void> login() async {
+    await FirebaseAuth.instance.signInAnonymously();
+    debugPrint("로그인 완료");
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Login")),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () async {
+            await login();
+            // 로그인 후 이벤트 페이지로 이동
+            // ignore: use_build_context_synchronously
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EventListPage(),
+              ),
+            );
+          },
+          child: const Text("로그인 후 일정 보기"),
+        ),
+      ),
+    );
+  }
+}
+
+/* ---------------- 일정 목록 페이지 ---------------- */
 
 class EventListPage extends StatefulWidget {
   const EventListPage({super.key});
@@ -33,7 +69,6 @@ class EventListPage extends StatefulWidget {
 class _EventListPageState extends State<EventListPage> {
   List<Map<String, dynamic>> events = [];
 
-  // STEP 9: Firestore Read
   Future<void> fetchEvents() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -41,11 +76,9 @@ class _EventListPageState extends State<EventListPage> {
       return;
     }
 
-    final uid = user.uid;
-
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
-        .doc(uid)
+        .doc(user.uid)
         .collection('events')
         .get();
 
@@ -55,7 +88,6 @@ class _EventListPageState extends State<EventListPage> {
       events = data;
     });
 
-    // 콘솔 확인용
     debugPrint("불러온 일정: $data");
   }
 
