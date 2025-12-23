@@ -15,6 +15,7 @@ import {
   orderBy,
   doc,
   updateDoc,
+  deleteDoc, // ✅ STEP 7 추가
 } from "firebase/firestore";
 
 const uid = ref("");
@@ -80,6 +81,7 @@ const fetchEvents = async () => {
     ...docSnap.data(),
   }));
 
+  // ✅ 전체 목록을 기본 화면으로
   filteredEvents.value = events.value;
 
   console.log("불러온 일정 목록:", events.value);
@@ -95,7 +97,7 @@ const getEventsByDate = (date) => {
 };
 
 // --------------------
-// STEP 6: Update (핵심 추가)
+// STEP 6: Update
 // --------------------
 const updateEvent = async (eventId) => {
   const user = auth.currentUser;
@@ -112,6 +114,29 @@ const updateEvent = async (eventId) => {
   );
 
   alert("일정 수정 완료!");
+};
+
+// --------------------
+// STEP 7: Delete (🔥 핵심)
+// --------------------
+const deleteEvent = async (eventId) => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("먼저 로그인하세요");
+    return;
+  }
+
+  await deleteDoc(
+    doc(db, "users", user.uid, "events", eventId)
+  );
+
+  // 🔥 화면에서도 즉시 제거
+  events.value = events.value.filter((e) => e.id !== eventId);
+  filteredEvents.value = filteredEvents.value.filter(
+    (e) => e.id !== eventId
+  );
+
+  alert("일정 삭제 완료!");
 };
 </script>
 <template>
@@ -141,14 +166,23 @@ const updateEvent = async (eventId) => {
         {{ event.date }} | {{ event.title }}
         ({{ event.startTime }} ~ {{ event.endTime }})
 
-        <!-- ✅ STEP 6: Update 버튼 -->
+        <!-- Update -->
         <button
           style="margin-left:10px"
           @click="updateEvent(event.id)"
         >
           수정(Update)
         </button>
+
+        <!-- ✅ STEP 7: Delete -->
+        <button
+          style="margin-left:6px; color:red"
+          @click="deleteEvent(event.id)"
+        >
+          삭제(Delete)
+        </button>
       </li>
     </ul>
   </div>
 </template>
+
