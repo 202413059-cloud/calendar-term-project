@@ -84,7 +84,7 @@ const fetchEvents = async () => {
 };
 
 /* =========================
-   📌 STEP 5: 날짜 필터링
+   📌 STEP 5: 날짜 필터링 (기존)
 ========================= */
 const getEventsByDate = (date) => {
   filteredEvents.value = events.value.filter(
@@ -128,8 +128,6 @@ const deleteEvent = async (eventId) => {
   filteredEvents.value = filteredEvents.value.filter(
     (e) => e.id !== eventId
   );
-
-  alert("일정 삭제 완료!");
 };
 
 /* =========================
@@ -174,6 +172,17 @@ const prevMonth = () => {
 const nextMonth = () => {
   currentDate.value = new Date(year(), month() + 1, 1);
 };
+
+/* =========================
+   📅 STEP 4: 날짜 클릭
+========================= */
+const selectedDate = ref(null);
+
+const selectDate = (date) => {
+  const ymd = date.toISOString().slice(0, 10);
+  selectedDate.value = ymd;
+  getEventsByDate(ymd); // 🔥 캘린더 클릭 → 일정 필터링
+};
 </script>
 
 <template>
@@ -195,54 +204,40 @@ const nextMonth = () => {
     <div style="display:flex; gap:12px; margin-bottom:16px;">
       <button @click="addEvent">일정 추가(Create)</button>
       <button @click="fetchEvents">일정 목록 조회(Read)</button>
-      <button @click="getEventsByDate('2025-12-26')">
-        2025-12-26 일정만 보기
-      </button>
     </div>
 
-    <!-- 📅 월 이동 버튼 -->
+    <!-- 📅 월 이동 -->
     <div style="display:flex; gap:12px; margin-bottom:12px;">
       <button @click="prevMonth">이전</button>
       <button @click="nextMonth">다음</button>
     </div>
 
-    <!-- 📅 캘린더 -->
     <h3>{{ year() }}년 {{ month() + 1 }}월</h3>
 
+    <!-- 📅 캘린더 -->
     <div class="calendar">
       <div
         v-for="day in days"
         :key="day.toISOString()"
         class="day"
         :class="getDayClass(day)"
+        @click="selectDate(day)"
       >
         {{ day.getDate() }}
       </div>
     </div>
 
-    <hr style="margin:24px 0;" />
+    <!-- 📌 선택 날짜 일정 -->
+    <div v-if="selectedDate" class="selected">
+      <h3>{{ selectedDate }} 일정</h3>
 
-    <!-- 일정 리스트 -->
-    <ul>
-      <li v-for="event in filteredEvents" :key="event.id">
-        {{ event.date }} | {{ event.title }}
-        ({{ event.startTime }} ~ {{ event.endTime }})
-
-        <button
-          style="margin-left:10px"
-          @click="updateEvent(event.id)"
-        >
-          수정
-        </button>
-
-        <button
-          style="margin-left:6px; color:red"
-          @click="deleteEvent(event.id)"
-        >
-          삭제
-        </button>
-      </li>
-    </ul>
+      <ul>
+        <li v-for="event in filteredEvents" :key="event.id">
+          {{ event.title }}
+          ({{ event.startTime }} ~ {{ event.endTime }})
+        </li>
+      </ul>
+    </div>
   </div>
 </template>
 
@@ -258,6 +253,11 @@ const nextMonth = () => {
   padding: 12px;
   border: 1px solid #ddd;
   text-align: center;
+  cursor: pointer;
+}
+
+.day:hover {
+  background: #f2f4f7;
 }
 
 .weekday {
@@ -268,5 +268,9 @@ const nextMonth = () => {
 }
 .sunday {
   color: #ff4d4f;
+}
+
+.selected {
+  margin-top: 24px;
 }
 </style>
