@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
+const Color pointColor = Color(0xFF4A6FA5); // 청회색 포인트
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -18,8 +20,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: LoginPage(),
+    return MaterialApp(
+      theme: ThemeData(
+        scaffoldBackgroundColor: Colors.white,
+        primaryColor: pointColor,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 1,
+        ),
+      ),
+      home: const LoginPage(),
     );
   }
 }
@@ -56,6 +67,14 @@ class LoginPage extends StatelessWidget {
       appBar: AppBar(title: const Text("Login (Google)")),
       body: Center(
         child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: pointColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
           onPressed: () => loginWithGoogle(context),
           child: const Text("Google 로그인"),
         ),
@@ -64,7 +83,7 @@ class LoginPage extends StatelessWidget {
   }
 }
 
-/* ================= 오늘 일정 페이지 (STEP 5 + 6) ================= */
+/* ================= 오늘 일정 페이지 (STEP 5 + 6 + 7) ================= */
 
 class TodayEventPage extends StatefulWidget {
   const TodayEventPage({super.key});
@@ -83,15 +102,14 @@ class _TodayEventPageState extends State<TodayEventPage> {
     fetchTodayEvents();
   }
 
-  // --------------------
-  // STEP 5: 오늘 일정 조회
-  // --------------------
+  /* ================= STEP 5: 오늘 일정 조회 ================= */
+
   Future<void> fetchTodayEvents() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final today = DateTime.now();
-    final todayString = today.toIso8601String().substring(0, 10);
+    final todayString =
+        DateTime.now().toIso8601String().substring(0, 10);
 
     final snapshot = await FirebaseFirestore.instance
         .collection('users')
@@ -103,9 +121,8 @@ class _TodayEventPageState extends State<TodayEventPage> {
       return {'id': doc.id, ...doc.data()};
     }).toList();
 
-    final filtered = events.where((e) =>
-      e['date'] == todayString
-    ).toList();
+    final filtered =
+        events.where((e) => e['date'] == todayString).toList();
 
     setState(() {
       todayEvents = filtered;
@@ -113,14 +130,12 @@ class _TodayEventPageState extends State<TodayEventPage> {
     });
   }
 
-  // --------------------
-  // STEP 6: 날짜 선택 → 일정 추가
-  // --------------------
+  /* ================= STEP 6: 날짜 선택 → 일정 추가 ================= */
+
   Future<void> addEventWithDatePicker() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // 🔥 날짜 선택
     final pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -133,7 +148,6 @@ class _TodayEventPageState extends State<TodayEventPage> {
     final dateString =
         pickedDate.toIso8601String().substring(0, 10);
 
-    // 🔥 선택한 날짜로 일정 추가
     await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -146,7 +160,6 @@ class _TodayEventPageState extends State<TodayEventPage> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // 오늘 일정이면 다시 로드
     fetchTodayEvents();
   }
 
@@ -165,8 +178,10 @@ class _TodayEventPageState extends State<TodayEventPage> {
         actions: [
           TextButton(
             onPressed: logout,
-            child: const Text("Logout",
-                style: TextStyle(color: Colors.white)),
+            child: const Text(
+              "Logout",
+              style: TextStyle(color: pointColor),
+            ),
           )
         ],
       ),
@@ -176,8 +191,11 @@ class _TodayEventPageState extends State<TodayEventPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text("현재 UID: $uid"),
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    "현재 UID: $uid",
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ),
                 const Divider(),
                 Expanded(
@@ -189,10 +207,20 @@ class _TodayEventPageState extends State<TodayEventPage> {
                           itemCount: todayEvents.length,
                           itemBuilder: (context, index) {
                             final e = todayEvents[index];
-                            return ListTile(
-                              title: Text(e['title']),
-                              subtitle: Text(
-                                "${e['startTime']} ~ ${e['endTime']}",
+                            return Card(
+                              elevation: 4,
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ListTile(
+                                title: Text(e['title']),
+                                subtitle: Text(
+                                  "${e['startTime']} ~ ${e['endTime']}",
+                                ),
                               ),
                             );
                           },
@@ -200,12 +228,11 @@ class _TodayEventPageState extends State<TodayEventPage> {
                 ),
               ],
             ),
-
-      // 🔥 STEP 6 버튼
       floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: pointColor,
         onPressed: addEventWithDatePicker,
         icon: const Icon(Icons.date_range),
-        label: const Text("날짜 선택 후 일정 추가"),
+        label: const Text("날짜 선택"),
       ),
     );
   }
