@@ -24,6 +24,16 @@ import {
 const POINT_COLOR = "#4a6fa5";
 
 /* =========================
+   🔧 날짜 유틸 (🔥 핵심)
+========================= */
+const formatDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`; // 로컬 기준 YYYY-MM-DD
+};
+
+/* =========================
    🔐 Auth 상태
 ========================= */
 const uid = ref("");
@@ -37,7 +47,7 @@ const login = async () => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
   uid.value = result.user.uid;
-  await fetchEvents(); // 🔥 로그인 후 자동 조회
+  await fetchEvents();
 };
 
 const logout = async () => {
@@ -90,9 +100,9 @@ const fetchEvents = async () => {
 /* =========================
    📌 날짜 필터링
 ========================= */
-const getEventsByDate = (date) => {
+const getEventsByDate = (ymd) => {
   filteredEvents.value = events.value.filter(
-    (e) => e.date === date
+    (e) => e.date === ymd
   );
 };
 
@@ -134,7 +144,7 @@ const deleteEvent = async (eventId) => {
 const currentDate = ref(new Date());
 
 const year = () => currentDate.value.getFullYear();
-const month = () => currentDate.value.getMonth(); // 0~11
+const month = () => currentDate.value.getMonth();
 
 const getDaysInMonth = (year, month) => {
   const days = [];
@@ -171,17 +181,17 @@ const nextMonth = () => {
 };
 
 /* =========================
-   📅 날짜 선택
+   📅 날짜 선택 (🔥 수정 핵심)
 ========================= */
 const selectedDate = ref(null);
 
 const selectDate = (date) => {
-  const ymd = date.toISOString().slice(0, 10);
+  const ymd = formatDate(date); // 🔥 로컬 기준
   selectedDate.value = ymd;
   getEventsByDate(ymd);
 };
 
-/* 🔄 달 바뀌면 선택 초기화 */
+/* 🔄 달 바뀌면 초기화 */
 watch(currentDate, () => {
   selectedDate.value = null;
   filteredEvents.value = events.value;
@@ -192,16 +202,13 @@ watch(currentDate, () => {
   <div class="page">
     <h2>Web Calendar</h2>
 
-    <!-- 로그인 -->
     <div class="row">
       <button @click="login">Google Login</button>
       <button @click="logout">Logout</button>
     </div>
 
-    <p v-if="uid" class="uid">UID: {{ uid }}</p>
-    <p v-else class="uid">로그인 안됨</p>
+    <p class="uid">{{ uid ? `UID: ${uid}` : "로그인 안됨" }}</p>
 
-    <!-- CRUD -->
     <div class="row">
       <button @click="addEvent">일정 추가</button>
       <button @click="fetchEvents">일정 조회</button>
@@ -218,11 +225,11 @@ watch(currentDate, () => {
       <div class="calendar">
         <div
           v-for="day in days"
-          :key="day.toISOString()"
+          :key="formatDate(day)"
           class="day"
           :class="[
             getDayClass(day),
-            selectedDate === day.toISOString().slice(0,10) ? 'active' : ''
+            selectedDate === formatDate(day) ? 'active' : ''
           ]"
           @click="selectDate(day)"
         >
@@ -231,7 +238,7 @@ watch(currentDate, () => {
       </div>
     </div>
 
-    <!-- 선택 날짜 일정 카드 -->
+    <!-- 선택 날짜 일정 -->
     <div v-if="selectedDate" class="card">
       <h3>{{ selectedDate }} 일정</h3>
 
