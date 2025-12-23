@@ -44,8 +44,6 @@ class LoginPage extends StatelessWidget {
         MaterialPageRoute(builder: (_) => const TodayEventPage()),
       );
     } catch (e) {
-      debugPrint("로그인 실패: $e");
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("로그인 실패: $e")),
       );
@@ -59,14 +57,14 @@ class LoginPage extends StatelessWidget {
       body: Center(
         child: ElevatedButton(
           onPressed: () => loginWithGoogle(context),
-          child: const Text("Google 로그인 후 오늘 일정 보기"),
+          child: const Text("Google 로그인"),
         ),
       ),
     );
   }
 }
 
-/* ================= 오늘 일정 페이지 (STEP 5) ================= */
+/* ================= 오늘 일정 페이지 (STEP 5 + 6) ================= */
 
 class TodayEventPage extends StatefulWidget {
   const TodayEventPage({super.key});
@@ -89,49 +87,67 @@ class _TodayEventPageState extends State<TodayEventPage> {
   // STEP 5: 오늘 일정 조회
   // --------------------
   Future<void> fetchTodayEvents() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() {
-          loading = false;
-          todayEvents = [];
-        });
-        return;
-      }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-      final today = DateTime.now();
-      final todayString = today.toIso8601String().substring(0, 10);
+    final today = DateTime.now();
+    final todayString = today.toIso8601String().substring(0, 10);
 
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('events')
-          .get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('events')
+        .get();
 
-      final events = snapshot.docs.map((doc) {
-        return {
-          'id': doc.id,
-          ...doc.data(),
-        };
-      }).toList();
+    final events = snapshot.docs.map((doc) {
+      return {'id': doc.id, ...doc.data()};
+    }).toList();
 
-      // 🔥 오늘 날짜 필터링
-      final filtered = events.where((e) =>
-        e['date'] == todayString
-      ).toList();
+    final filtered = events.where((e) =>
+      e['date'] == todayString
+    ).toList();
 
-      setState(() {
-        todayEvents = filtered;
-        loading = false;
-      });
+    setState(() {
+      todayEvents = filtered;
+      loading = false;
+    });
+  }
 
-    } catch (e) {
-      debugPrint("오늘 일정 불러오기 실패: $e");
-      setState(() {
-        loading = false;
-        todayEvents = [];
-      });
-    }
+  // --------------------
+  // STEP 6: 날짜 선택 → 일정 추가
+  // --------------------
+  Future<void> addEventWithDatePicker() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // 🔥 날짜 선택
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2027),
+    );
+
+    if (pickedDate == null) return;
+
+    final dateString =
+        pickedDate.toIso8601String().substring(0, 10);
+
+    // 🔥 선택한 날짜로 일정 추가
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('events')
+        .add({
+      'title': '모바일에서 추가한 일정',
+      'date': dateString,
+      'startTime': '14:00',
+      'endTime': '15:00',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // 오늘 일정이면 다시 로드
+    fetchTodayEvents();
   }
 
   Future<void> logout() async {
@@ -141,7 +157,7 @@ class _TodayEventPageState extends State<TodayEventPage> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? "(로그인 없음)";
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "(없음)";
 
     return Scaffold(
       appBar: AppBar(
@@ -149,7 +165,8 @@ class _TodayEventPageState extends State<TodayEventPage> {
         actions: [
           TextButton(
             onPressed: logout,
-            child: const Text("Logout", style: TextStyle(color: Colors.white)),
+            child: const Text("Logout",
+                style: TextStyle(color: Colors.white)),
           )
         ],
       ),
@@ -165,13 +182,15 @@ class _TodayEventPageState extends State<TodayEventPage> {
                 const Divider(),
                 Expanded(
                   child: todayEvents.isEmpty
-                      ? const Center(child: Text("오늘 일정이 없습니다"))
+                      ? const Center(
+                          child: Text("오늘 일정이 없습니다"),
+                        )
                       : ListView.builder(
                           itemCount: todayEvents.length,
                           itemBuilder: (context, index) {
                             final e = todayEvents[index];
                             return ListTile(
-                              title: Text(e['title'] ?? ''),
+                              title: Text(e['title']),
                               subtitle: Text(
                                 "${e['startTime']} ~ ${e['endTime']}",
                               ),
@@ -181,6 +200,13 @@ class _TodayEventPageState extends State<TodayEventPage> {
                 ),
               ],
             ),
+
+      // 🔥 STEP 6 버튼
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: addEventWithDatePicker,
+        icon: const Icon(Icons.date_range),
+        label: const Text("날짜 선택 후 일정 추가"),
+      ),
     );
   }
 }
