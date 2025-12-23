@@ -18,65 +18,74 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: LoginPage(),
+      home: EventListPage(),
     );
   }
 }
 
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
+class EventListPage extends StatefulWidget {
+  const EventListPage({super.key});
 
-  Future<void> signInWithGoogle() async {
-    final userCredential =
-        await FirebaseAuth.instance.signInWithPopup(
-          GoogleAuthProvider(),
-        );
+  @override
+  State<EventListPage> createState() => _EventListPageState();
+}
 
-    final user = userCredential.user;
-    print(user?.uid);
-  }
+class _EventListPageState extends State<EventListPage> {
+  List<Map<String, dynamic>> events = [];
 
-  Future<void> addTestEvent() async {
+  // STEP 9: Firestore Read
+  Future<void> fetchEvents() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('로그인 필요');
+      debugPrint("로그인 안 됨");
       return;
     }
 
-    await FirebaseFirestore.instance
+    final uid = user.uid;
+
+    final snapshot = await FirebaseFirestore.instance
         .collection('users')
-        .doc(user.uid)
+        .doc(uid)
         .collection('events')
-        .add({
-      'title': '테스트 일정',
-      'date': '2025-12-26',
-      'startTime': '10:00',
-      'endTime': '11:00',
-      'createdAt': Timestamp.now(),
+        .get();
+
+    final data = snapshot.docs.map((doc) => doc.data()).toList();
+
+    setState(() {
+      events = data;
     });
 
-    print('이벤트 저장 완료');
+    // 콘솔 확인용
+    debugPrint("불러온 일정: $data");
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Flutter Firebase Test")),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: signInWithGoogle,
-              child: const Text("Google Login"),
+      appBar: AppBar(title: const Text("Mobile Event List")),
+      body: Column(
+        children: [
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: fetchEvents,
+            child: const Text("일정 목록 불러오기"),
+          ),
+          const Divider(),
+          Expanded(
+            child: ListView.builder(
+              itemCount: events.length,
+              itemBuilder: (context, index) {
+                final e = events[index];
+                return ListTile(
+                  title: Text(e['title'] ?? ''),
+                  subtitle: Text(
+                    "${e['date']} ${e['startTime']} ~ ${e['endTime']}",
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: addTestEvent,
-              child: const Text("이벤트 저장 테스트"),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
