@@ -104,64 +104,62 @@ class _TodayEventPageState extends State<TodayEventPage> {
 
   /* ================= STEP 5: 오늘 일정 조회 ================= */
 
-  Future<void> fetchTodayEvents() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+Future<void> fetchTodayEvents() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-    final todayString =
-        DateTime.now().toIso8601String().substring(0, 10);
+  final todayString =
+      DateTime.now().toIso8601String().substring(0, 10);
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('events')
-        .get();
+  final snapshot = await FirebaseFirestore.instance
+      .collection('schedules')
+      .where('uid', isEqualTo: user.uid)
+      .where('date', isEqualTo: todayString)
+      .orderBy('createdAt')
+      .get();
 
-    final events = snapshot.docs.map((doc) {
-      return {'id': doc.id, ...doc.data()};
-    }).toList();
+  final events = snapshot.docs.map((doc) {
+    return {'id': doc.id, ...doc.data()};
+  }).toList();
 
-    final filtered =
-        events.where((e) => e['date'] == todayString).toList();
+  setState(() {
+    todayEvents = events;
+    loading = false;
+  });
+}
 
-    setState(() {
-      todayEvents = filtered;
-      loading = false;
-    });
-  }
 
   /* ================= STEP 6: 날짜 선택 → 일정 추가 ================= */
+Future<void> addEventWithDatePicker() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-  Future<void> addEventWithDatePicker() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  final pickedDate = await showDatePicker(
+    context: context,
+    initialDate: DateTime.now(),
+    firstDate: DateTime(2024),
+    lastDate: DateTime(2027),
+  );
 
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2027),
-    );
+  if (pickedDate == null) return;
 
-    if (pickedDate == null) return;
+  final dateString =
+      pickedDate.toIso8601String().substring(0, 10);
 
-    final dateString =
-        pickedDate.toIso8601String().substring(0, 10);
+  await FirebaseFirestore.instance
+      .collection('schedules')
+      .add({
+    'uid': user.uid,
+    'title': '모바일에서 추가한 일정',
+    'date': dateString,
+    'startTime': '14:00',
+    'endTime': '15:00',
+    'createdAt': FieldValue.serverTimestamp(),
+  });
 
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('events')
-        .add({
-      'title': '모바일에서 추가한 일정',
-      'date': dateString,
-      'startTime': '14:00',
-      'endTime': '15:00',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  fetchTodayEvents();
+}
 
-    fetchTodayEvents();
-  }
 
   Future<void> logout() async {
     await FirebaseAuth.instance.signOut();
