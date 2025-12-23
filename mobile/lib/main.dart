@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'firebase_options.dart'; // ⭐ 추가
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // ⭐ 수정
+  );
   runApp(const MyApp());
 }
 
@@ -34,10 +37,9 @@ class LoginPage extends StatelessWidget {
       idToken: googleAuth.idToken,
     );
 
-    final userCredential =
-        await FirebaseAuth.instance.signInWithCredential(credential);
+    await FirebaseAuth.instance.signInWithCredential(credential);
 
-    // ✅ STEP 12에서 요구하는 핵심
+    // ✅ STEP 12 요구사항
     final user = FirebaseAuth.instance.currentUser;
     print(user?.uid);
   }
