@@ -30,7 +30,7 @@ const formatDate = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`; // 로컬 기준 YYYY-MM-DD
+  return `${y}-${m}-${d}`; // YYYY-MM-DD
 };
 
 /* =========================
@@ -39,6 +39,7 @@ const formatDate = (date) => {
 const uid = ref("");
 const events = ref([]);
 const filteredEvents = ref([]);
+const selectedDate = ref(null);
 
 /* =========================
    🔐 로그인 / 로그아웃
@@ -59,15 +60,18 @@ const logout = async () => {
 };
 
 /* =========================
-   📌 Create
+   📌 Create (🔥 schedules에 저장)
 ========================= */
 const addEvent = async () => {
   const user = auth.currentUser;
   if (!user) return;
 
-  await addDoc(collection(db, "users", user.uid, "events"), {
-    title: "테스트 일정",
-    date: "2025-12-26",
+  const today = formatDate(new Date());
+
+  await addDoc(collection(db, "schedules"), {
+    uid: user.uid,
+    title: "웹에서 추가한 일정",
+    date: today,
     startTime: "10:00",
     endTime: "12:00",
     createdAt: serverTimestamp(),
@@ -77,22 +81,26 @@ const addEvent = async () => {
 };
 
 /* =========================
-   📌 Read
+   📌 Read (🔥 schedules에서 조회)
 ========================= */
 const fetchEvents = async () => {
   const user = auth.currentUser;
   if (!user) return;
 
   const q = query(
-    collection(db, "users", user.uid, "events"),
+    collection(db, "schedules"),
     orderBy("createdAt", "desc")
   );
 
   const snapshot = await getDocs(q);
-  events.value = snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-  }));
+
+  // 🔥 uid 기준 필터링
+  events.value = snapshot.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }))
+    .filter((e) => e.uid === user.uid);
 
   filteredEvents.value = events.value;
 };
@@ -110,14 +118,10 @@ const getEventsByDate = (ymd) => {
    📌 Update
 ========================= */
 const updateEvent = async (eventId) => {
-  const user = auth.currentUser;
-  if (!user) return;
-
   await updateDoc(
-    doc(db, "users", user.uid, "events", eventId),
+    doc(db, "schedules", eventId),
     { title: "수정된 일정" }
   );
-
   await fetchEvents();
 };
 
@@ -125,13 +129,7 @@ const updateEvent = async (eventId) => {
    📌 Delete
 ========================= */
 const deleteEvent = async (eventId) => {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  await deleteDoc(
-    doc(db, "users", user.uid, "events", eventId)
-  );
-
+  await deleteDoc(doc(db, "schedules", eventId));
   events.value = events.value.filter((e) => e.id !== eventId);
   filteredEvents.value = filteredEvents.value.filter(
     (e) => e.id !== eventId
@@ -181,17 +179,14 @@ const nextMonth = () => {
 };
 
 /* =========================
-   📅 날짜 선택 (🔥 수정 핵심)
+   📅 날짜 선택
 ========================= */
-const selectedDate = ref(null);
-
 const selectDate = (date) => {
-  const ymd = formatDate(date); // 🔥 로컬 기준
+  const ymd = formatDate(date);
   selectedDate.value = ymd;
   getEventsByDate(ymd);
 };
 
-/* 🔄 달 바뀌면 초기화 */
 watch(currentDate, () => {
   selectedDate.value = null;
   filteredEvents.value = events.value;
@@ -214,7 +209,6 @@ watch(currentDate, () => {
       <button @click="fetchEvents">일정 조회</button>
     </div>
 
-    <!-- 캘린더 카드 -->
     <div class="card">
       <div class="row space">
         <button @click="prevMonth">이전</button>
@@ -238,7 +232,6 @@ watch(currentDate, () => {
       </div>
     </div>
 
-    <!-- 선택 날짜 일정 -->
     <div v-if="selectedDate" class="card">
       <h3>{{ selectedDate }} 일정</h3>
 
