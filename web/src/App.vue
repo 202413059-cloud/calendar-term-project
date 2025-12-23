@@ -9,18 +9,17 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import {
   collection,
   addDoc,
+  serverTimestamp,
   getDocs,
   query,
   orderBy,
-  serverTimestamp,
 } from "firebase/firestore";
 
 const uid = ref("");
-const events = ref([]); // ✅ STEP 4: 일정 목록 상태
+const events = ref([]);
+const filteredEvents = ref([]);
 
-// --------------------
-// 로그인 / 로그아웃
-// --------------------
+// 로그인
 const login = async () => {
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
@@ -28,15 +27,15 @@ const login = async () => {
   console.log("login uid:", uid.value);
 };
 
+// 로그아웃
 const logout = async () => {
   await signOut(auth);
   uid.value = "";
   events.value = [];
+  filteredEvents.value = [];
 };
 
-// --------------------
-// ✅ STEP 3: Create (일정 추가)
-// --------------------
+// STEP 3: Create
 const addEvent = async () => {
   const user = auth.currentUser;
   if (!user) {
@@ -52,18 +51,13 @@ const addEvent = async () => {
     createdAt: serverTimestamp(),
   });
 
-  alert("Firestore에 일정 추가 완료!");
+  alert("일정 추가 완료!");
 };
 
-// --------------------
-// ✅ STEP 4: Read (일정 목록 조회)
-// --------------------
+// STEP 4: Read
 const fetchEvents = async () => {
   const user = auth.currentUser;
-  if (!user) {
-    alert("먼저 로그인하세요");
-    return;
-  }
+  if (!user) return;
 
   const q = query(
     collection(db, "users", user.uid, "events"),
@@ -71,13 +65,19 @@ const fetchEvents = async () => {
   );
 
   const snapshot = await getDocs(q);
-
-  events.value = snapshot.docs.map((doc) => ({
+  events.value = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data(),
   }));
 
   console.log("불러온 일정 목록:", events.value);
+};
+
+// STEP 5: 특정 날짜 필터링
+const getEventsByDate = (date) => {
+  filteredEvents.value = events.value.filter(
+    e => e.date === date
+  );
 };
 </script>
 
@@ -98,13 +98,14 @@ const fetchEvents = async () => {
     <div style="display:flex; gap:12px; margin-bottom:16px;">
       <button @click="addEvent">일정 추가(Create)</button>
       <button @click="fetchEvents">일정 목록 조회(Read)</button>
+      <button @click="getEventsByDate('2025-12-26')">
+        2025-12-26 일정만 보기
+      </button>
     </div>
 
-    <!-- ✅ STEP 4 결과 출력 -->
     <ul>
-      <li v-for="event in events" :key="event.id">
-        {{ event.date }} |
-        {{ event.title }}
+      <li v-for="event in filteredEvents" :key="event.id">
+        {{ event.date }} | {{ event.title }}
         ({{ event.startTime }} ~ {{ event.endTime }})
       </li>
     </ul>
