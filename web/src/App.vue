@@ -163,6 +163,17 @@ const getDayClass = (date) => {
   if (day === 6) return "saturday";
   return "weekday";
 };
+
+/* =========================
+   📅 STEP 3: 월 이동
+========================= */
+const prevMonth = () => {
+  currentDate.value = new Date(year(), month() - 1, 1);
+};
+
+const nextMonth = () => {
+  currentDate.value = new Date(year(), month() + 1, 1);
+};
 </script>
 
 <template>
@@ -187,6 +198,12 @@ const getDayClass = (date) => {
       <button @click="getEventsByDate('2025-12-26')">
         2025-12-26 일정만 보기
       </button>
+    </div>
+
+    <!-- 📅 월 이동 버튼 -->
+    <div style="display:flex; gap:12px; margin-bottom:12px;">
+      <button @click="prevMonth">이전</button>
+      <button @click="nextMonth">다음</button>
     </div>
 
     <!-- 📅 캘린더 -->
@@ -243,15 +260,12 @@ const getDayClass = (date) => {
   text-align: center;
 }
 
-/* STEP 2: 요일 색상 */
 .weekday {
   color: #000;
 }
-
 .saturday {
   color: #2f6fff;
 }
-
 .sunday {
   color: #ff4d4f;
 }
