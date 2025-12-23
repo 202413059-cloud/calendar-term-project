@@ -1,4 +1,5 @@
 <script setup>
+<<<<<<< HEAD
 import HelloWorld from './components/HelloWorld.vue'
 </script>
 
@@ -28,3 +29,24 @@ import HelloWorld from './components/HelloWorld.vue'
   filter: drop-shadow(0 0 2em #42b883aa);
 }
 </style>
+=======
+import { auth } from "./firebase";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+
+const provider = new GoogleAuthProvider();
+
+const login = async () => {
+  const result = await signInWithPopup(auth, provider);
+  console.log(result.user.uid);
+};
+
+const logout = async () => {
+  await signOut(auth);
+};
+</script>
+
+<template>
+  <button @click="login">Google Login</button>
+  <button @click="logout">Logout</button>
+</template>
+>>>>>>> f9fafc0a55b6ab8efeacfffd936c421cc970f11c
