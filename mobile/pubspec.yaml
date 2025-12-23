@@ -14,7 +14,8 @@ dependencies:
 
   firebase_core: ^2.30.0
   firebase_auth: ^4.19.0
-  google_sign_in: ^6.2.1
+  cloud_firestore: ^4.15.0   # ⭐ 추가 (핵심)
+  google_sign_in: ^6.2.1     # ← 있어도 됨 (지금은 안 써도 OK)
 
 dev_dependencies:
   flutter_test:
